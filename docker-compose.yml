@@ -1,33 +1,31 @@
-version: "3.9"
+name: obscyra
 services:
-  server:
-    image: ghcr.io/rohits-web03/obscyra-server:latest
-    container_name: obscyra-server
-    env_file:
-      - .env.server
-    ports:
-      - "8080:8080"
-    networks:
-      - obscyra-net
+    server:
+        image: ghcr.io/rkd-sh64/obscyra:latest
+        container_name: obscyra
+        env_file:
+            - .env.server
+        ports:
+            - '8080:8080'
+        networks:
+            - obscyra-net
 
-  web:
-    build:
-      context: .
-      dockerfile: Dockerfile
-      target: development
-    env_file:
-      - .env.web
-    ports:
-      - "5173:5173"
-    volumes:
-      - .:/app
-      - /app/node_modules
-    depends_on:
-      - server
-    networks:
-      - obscyra-net
+    web:
+        build:
+            context: .
+            dockerfile: Dockerfile
+            target: development
+        env_file:
+            - .env.web
+        ports:
+            - '5173:5173'
+        volumes:
+            - .:/app
+            - /app/node_modules
+        depends_on:
+            - server
+        networks:
+            - obscyra-net
 
 networks:
-  obscyra-net:
-
-
+    obscyra-net:
