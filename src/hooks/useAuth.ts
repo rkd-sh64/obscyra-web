@@ -16,12 +16,12 @@ export const useAuth = () => {
     const checkAuth = async () => {
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/auth/me`,
+          `${import.meta.env.VITE_BACKEND_URL}/api/v1/me`,
           { withCredentials: true }
         );
 
         if (!cancelled) {
-          setUser(response.data.user); 
+          setUser(response.data); 
         }
       } catch {
         if (!cancelled) {
