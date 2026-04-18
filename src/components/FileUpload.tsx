@@ -14,11 +14,13 @@ import {
 	Upload,
 	Trash2,
 	Copy,
+	UserX,
 	Share2,
 	FileIcon,
 	CheckCircle2,
 	Link as LinkIcon,
 	ChevronLeft,
+	CheckCircle,
 } from 'lucide-react';
 import { Loader2 } from 'lucide-react';
 import QRCode from 'qrcode';
@@ -41,6 +43,8 @@ const FileUpload: React.FC = () => {
 		minutes: 0,
 		seconds: 0,
 	});
+	const [receiverMode, setReceiverMode] = useState<'anonymous' | 'verified' | null>(null);
+	const [showModeModal, setShowModeModal] = useState(true);
 	const navigate = useNavigate();
 
 	useEffect(() => {
@@ -173,6 +177,16 @@ const FileUpload: React.FC = () => {
 
 	const handleUpload = async () => {
 		try {
+			if (!receiverMode) {
+				toast.error('Please select receiver mode');
+				return;
+			}
+
+			if (receiverMode === 'verified' && !recipientPubKey) {
+				toast.error('Public key required for verified receiver');
+				return;
+			}
+
 			if (!files.length) {
 				toast.error('No files selected');
 				return;
@@ -413,16 +427,16 @@ const FileUpload: React.FC = () => {
 
 			<div className="relative z-10 min-h-screen flex flex-col">
 				{/* Breadcrumb */}
-					<div className="mb-4 mt-8 mx-4 px-2 max-sm:px-0">
-						<Link
-							to="/dashboard"
-							className="inline-flex items-center gap-2 text-p4/70 hover:text-p4 transition-colors text-sm rounded-md px-2 py-1"
-							aria-label="Back to dashboard"
-						>
-							<ChevronLeft size={16} className="text-p1" />
-							<span>Back to dashboard</span>
-						</Link>
-					</div>
+				<div className="mb-4 mt-8 mx-4 px-2 max-sm:px-0">
+					<Link
+						to="/dashboard"
+						className="inline-flex items-center gap-2 text-p4/70 hover:text-p4 transition-colors text-sm rounded-md px-2 py-1"
+						aria-label="Back to dashboard"
+					>
+						<ChevronLeft size={16} className="text-p1" />
+						<span>Back to dashboard</span>
+					</Link>
+				</div>
 				{/* Header */}
 				<motion.header
 					initial={{ opacity: 0, y: -20 }}
@@ -430,7 +444,7 @@ const FileUpload: React.FC = () => {
 					transition={{ duration: 0.6 }}
 					className="pt-8 pb-6 px-6 text-center max-w-4xl mx-auto w-full"
 				>
-					
+
 
 					<h1 className="text-5xl font-bold mb-3 text-p4 max-md:text-4xl max-sm:text-3xl">
 						{uploadComplete ? '' : 'Upload Files'}
@@ -465,6 +479,26 @@ const FileUpload: React.FC = () => {
 									>
 										{/* Upload Card */}
 										<div className="relative border-2 border-s4/25 bg-s1/50 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden p-6 max-md:p-5 max-sm:p-4">
+											{receiverMode && (
+												<div className="mb-3 flex justify-end">
+													<span className={`inline-flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-full border text-p4 ${receiverMode === 'verified'
+															? 'border-blue-500/40 bg-blue-500/10'
+															: 'border-purple-500/40 bg-purple-500/10'
+														}`}>
+														{receiverMode === 'verified' ? (
+															<>
+																<CheckCircle className="w-3.5 h-3.5 text-p1" />
+																<span>Verified Mode</span>
+															</>
+														) : (
+															<>
+																<UserX className="w-3.5 h-3.5 text-p1" />
+																<span>Anonymous Mode</span>
+															</>
+														)}
+													</span>
+												</div>
+											)}
 											{/* Gradient overlay */}
 											<div className="absolute top-0 left-0 right-0 h-48 bg-gradient-to-br from-purple-500/20 via-blue-500/20 to-transparent opacity-50 blur-xl" />
 
@@ -525,13 +559,15 @@ const FileUpload: React.FC = () => {
 													</motion.div>
 												)}
 											</div>
-											<Input
-												type="text"
-												placeholder="Enter recipient's public key"
-												value={recipientPubKey}
-												onChange={(e) => setRecipientPubKey(e.target.value)}
-												className="mt-4 w-full border-s4/25 rounded-xl py-6 focus:border-p1/50 focus:bg-s1/30 focus:outline-none focus:ring-2 focus:ring-s1/70 transition-all duration-300 max-md:py-4 max-sm:py-2"
-											/>
+											{receiverMode === 'verified' && (
+												<Input
+													type="text"
+													placeholder="Enter recipient's public key"
+													value={recipientPubKey}
+													onChange={(e) => setRecipientPubKey(e.target.value)}
+													className="mt-4 w-full border-s4/25 rounded-xl py-6 focus:border-p1/50 focus:bg-s1/30 focus:outline-none focus:ring-2 focus:ring-s1/70 transition-all duration-300"
+												/>
+											)}
 										</div>
 
 										{/* Action Buttons */}
@@ -545,7 +581,7 @@ const FileUpload: React.FC = () => {
 												>
 													<Button
 														onClick={handleUpload}
-														disabled={isUploading}
+														disabled={isUploading || !receiverMode}
 														className="flex-1 py-3 text-base bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer max-sm:py-2.5 max-sm:text-sm"
 														style={{
 															backgroundSize: '200% 100%',
@@ -903,7 +939,74 @@ const FileUpload: React.FC = () => {
 					</AnimatePresence>
 				</div>
 			</div>
+			<AnimatePresence>
+				{showModeModal && (
+					<motion.div
+						initial={{ opacity: 0 }}
+						animate={{ opacity: 1 }}
+						exit={{ opacity: 0 }}
 
+						className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm px-4"
+					>
+						<motion.div
+							initial={{ scale: 0.85, opacity: 0 }}
+							animate={{ scale: 1, opacity: 1 }}
+							exit={{ scale: 0.85, opacity: 0 }}
+
+							transition={{ type: 'spring', stiffness: 260, damping: 20 }}
+							className="w-full max-w-md bg-s1 border-2 border-s4/25 rounded-2xl p-6 shadow-2xl"
+						>
+							<h2 className="text-xl font-bold text-p4 text-center mb-5">
+								Select Receiver Mode
+							</h2>
+
+							<div className="grid grid-cols-2 gap-3 max-sm:grid-cols-1">
+								{/* Anonymous */}
+								<div
+									onClick={() => setReceiverMode('anonymous')}
+									className={`cursor-pointer flex flex-col items-center text-center gap-2 border rounded-xl p-4 transition-all hover:scale-105 ${receiverMode === 'anonymous'
+										? 'border-p1 bg-s1/40'
+										: 'border-s4/25 hover:bg-s1/30'
+										}`}
+								>
+									<div className="p-3 rounded-xl bg-purple-500/20">
+										<UserX className="text-p1" size={22} />
+									</div>
+									<p className="text-p4 font-semibold text-sm">Anonymous</p>
+									<p className="text-p4/60 text-xs">
+										Anyone with the link can access
+									</p>
+								</div>
+
+								{/* Verified */}
+								<div
+									onClick={() => setReceiverMode('verified')}
+									className={`cursor-pointer flex flex-col items-center text-center gap-2 border rounded-xl p-4 transition-all hover:scale-105 ${receiverMode === 'verified'
+										? 'border-p1 bg-s1/40'
+										: 'border-s4/25 hover:bg-s1/30'
+										}`}
+								>
+									<div className="p-3 rounded-xl bg-blue-500/20">
+										<CheckCircle2 className="text-p1" size={22} />
+									</div>
+									<p className="text-p4 font-semibold text-sm">Verified</p>
+									<p className="text-p4/60 text-xs">
+										Requires recipient public key
+									</p>
+								</div>
+							</div>
+
+							<Button
+								className="cursor-pointer w-full mt-6 bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500 text-white"
+								disabled={!receiverMode}
+								onClick={() => setShowModeModal(false)}
+							>
+								Continue
+							</Button>
+						</motion.div>
+					</motion.div>
+				)}
+			</AnimatePresence>
 			<style>{`
 				.custom-scrollbar {
 					scrollbar-width: thin;
