@@ -5,7 +5,7 @@ import Register from '@/components/Register';
 import Dashboard from '@/components/Dashboard';
 import LandingPage from '@/routes/LandingPage';
 import ProtectedRoute from '@/components/ProtectedRoute';
-
+import PublicRoute from '@/components/PublicRoute';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Toaster } from 'sonner';
 
@@ -14,8 +14,8 @@ function App() {
 		<BrowserRouter>
 			<Routes>
 				<Route path="/" element={<LandingPage />} />
-				<Route path="/login" element={<Login />} />
-				<Route path="/register" element={<Register />} />
+				<Route path="/login" element={<PublicRoute><Login /></PublicRoute>} />
+				<Route path="/register" element={<PublicRoute><Register /></PublicRoute>} />
 
 				{/* Dashboard Route */}
 				<Route path="/dashboard" element={<ProtectedRoute>

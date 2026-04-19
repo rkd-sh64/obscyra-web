@@ -16,7 +16,7 @@ export const useAuth = () => {
     const checkAuth = async () => {
       try {
         const response = await axios.get(
-          `${import.meta.env.VITE_BACKEND_URL}/api/v1/me`,
+          `${import.meta.env.VITE_API_BASE_URL}/api/v1/me`,
           { withCredentials: true }
         );
 
