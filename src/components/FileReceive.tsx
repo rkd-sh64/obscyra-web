@@ -1,17 +1,32 @@
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { decryptFileWithSessionKey, importKey, RSA_ALGORITHM, unwrapSessionKey } from '@/crypto';
-import { formatFileSize } from '@/lib/utils';
+import { useAuth } from '@/context/AuthContext';
+import {
+	base64ToArrayBuffer,
+	decryptFileWithSessionKey,
+	importKey,
+	RSA_ALGORITHM,
+	unwrapSessionKey,
+} from '@/crypto';
+import { formatFileSize, fromUrlSafeBase64 } from '@/lib/utils';
 import { receiveSchema } from '@/schema/file';
 import { type File, type ReceiveInput } from '@/types/file';
 import { zodResolver } from '@hookform/resolvers/zod';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
-import { Download, File as FileIcon, Loader2, Inbox, CheckCircle2, Package, ChevronLeft } from 'lucide-react';
+import {
+	Download,
+	File as FileIcon,
+	Loader2,
+	Inbox,
+	CheckCircle2,
+	Package,
+	ChevronLeft,
+} from 'lucide-react';
 import React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { useNavigate, Link } from 'react-router-dom';
+import { Link, useLocation } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const FileReceive: React.FC = () => {
@@ -19,17 +34,18 @@ const FileReceive: React.FC = () => {
 	const [downloadingIndex, setDownloadingIndex] = useState<number | null>(null);
 	const [decryptionKey, setDecryptionKey] = useState<CryptoKey | null>(null);
 	const shareCode = useRef<string>('');
-	const navigate = useNavigate();
 	const {
 		register,
 		handleSubmit,
-		reset,
 		setValue,
 		formState: { errors, isSubmitting },
 	} = useForm<ReceiveInput>({
 		resolver: zodResolver(receiveSchema),
 		defaultValues: { sharingCode: '' },
 	});
+	const { user } = useAuth();
+	const location = useLocation();
+	const isAnonymousShare = useRef(false);
 
 	// Extract sharing code from URL and auto-fill input (without auto-submitting)
 	useEffect(() => {
@@ -42,59 +58,97 @@ const FileReceive: React.FC = () => {
 		}
 	}, [setValue]);
 
-	const fetchFiles = async (sharingCode: string) => {
+	useEffect(() => {
+		console.log('Location Hash:', location.hash);
+		isAnonymousShare.current = location.hash.slice(1).length > 0;
+	}, [location.hash]);
+
+	const fetchFiles = async (sharingCode: string, sharingMode: string) => {
 		try {
 			shareCode.current = sharingCode;
-			const response = await axios.get(
-				`${import.meta.env.VITE_API_BASE_URL}/api/v1/share/${sharingCode}`,
-				{ withCredentials: true }
-			);
-			const { files, encrypted_key } = response?.data?.data || {};
+			if (sharingMode === 'verified') {
+				const response = await axios.get(
+					`${import.meta.env.VITE_API_BASE_URL}/api/v1/share/${sharingCode}`,
+					{ withCredentials: true }
+				);
+				const { files, encrypted_key } = response?.data?.data || {};
 
-			if (!encrypted_key) {
-				// If no key, either it's an old unencrypted transfer or error
-				console.log(
-					'Missing encryption key for transfer. Possibly old unencrypted transfer or incorrect client.'
+				if (!encrypted_key) {
+					// If no key, either it's an old unencrypted transfer or error
+					console.log(
+						'Missing encryption key for transfer. Possibly old unencrypted transfer or incorrect client.'
+					);
+					throw new Error(
+						'Unable to decrypt this file. Please check your access link or try again.'
+					);
+				}
+
+				// Load User's Private Key from Storage
+				const storedJWK = sessionStorage.getItem('file_access_key');
+				if (!storedJWK) {
+					throw new Error('Decryption key not found. Please Login again.');
+				}
+
+				// Rehydrate Private Key
+				const privateKey = await importKey(
+					JSON.parse(storedJWK),
+					'jwk',
+					RSA_ALGORITHM,
+					true,
+					['decrypt', 'unwrapKey']
 				);
-				throw new Error(
-					'Unable to decrypt this file. Please check your access link or try again.'
+
+				// Unwrap the Session Key (Digital Envelope)
+				const sessionKey = await unwrapSessionKey(encrypted_key, privateKey);
+
+				// Store in State for downloads
+				setDecryptionKey(sessionKey);
+				setreceivedFiles(files);
+			} else {
+				// Anonymous sharing - no decryption, just fetch file metadata
+				const hash = location.hash.slice(1); // Remove the '#' character
+				if (!hash) {
+					throw new Error('Invalid Link');
+				}
+
+				const response = await axios.get(
+					`${import.meta.env.VITE_API_BASE_URL}/api/v1/public/share/${sharingCode}`,
+					{ withCredentials: true }
 				);
+
+				const { files } = response?.data?.data || {};
+				if (!files || !Array.isArray(files) || files.length === 0) {
+					throw new Error('No files found for this sharing code');
+				}
+				setreceivedFiles(files || []);
+				const sessionKey = await importKey(
+					base64ToArrayBuffer(fromUrlSafeBase64(hash)),
+					'raw',
+					'AES-GCM',
+					false,
+					['decrypt']
+				);
+				setDecryptionKey(sessionKey);
 			}
 
-			// Load User's Private Key from Storage
-			const storedJWK = sessionStorage.getItem('file_access_key');
-			if (!storedJWK) {
-				throw new Error('Decryption key not found. Please Login again.');
-			}
-
-			// Rehydrate Private Key
-			const privateKey = await importKey(JSON.parse(storedJWK), 'jwk', RSA_ALGORITHM, true, [
-				'decrypt',
-				'unwrapKey',
-			]);
-
-			// Unwrap the Session Key (Digital Envelope)
-			const sessionKey = await unwrapSessionKey(encrypted_key, privateKey);
-
-			// Store in State for downloads
-			setDecryptionKey(sessionKey);
-			setreceivedFiles(files);
 			toast.success('Files received successfully');
 		} catch (error: unknown) {
 			if (axios.isAxiosError(error)) {
 				console.error(error.response?.data?.message);
 				toast.error(error.response?.data?.message || 'Failed to fetch files');
 			} else {
-				console.error(error);
-				toast.error('An unexpected error occurred');
+				const errorMessage =
+					error instanceof Error ? error.message : 'An unexpected error occurred';
+				console.error(errorMessage);
+				toast.error(errorMessage);
 			}
 		}
 	};
 
 	const onSubmit = async ({ sharingCode }: ReceiveInput) => {
-		await fetchFiles(sharingCode);
-		reset();
-		navigate('/share/receive');
+		await fetchFiles(sharingCode, user ? 'verified' : 'anonymous');
+		// reset();
+		// navigate('/share/receive'); // Can't reset or navigate away as hash will be lost
 	};
 
 	const handleDownload = async (index: number) => {
@@ -105,26 +159,32 @@ const FileReceive: React.FC = () => {
 			}
 
 			setDownloadingIndex(index);
+			console.log('IsAnonymousShare:', isAnonymousShare.current);
+			const presignUrl = isAnonymousShare.current
+				? `/api/v1/public/share/${shareCode.current}/presign-download/${index}`
+				: `/api/v1/share/${shareCode.current}/presign-download/${index}`;
 
 			// Request presigned download URL
-			const response = await axios.get(
-				`${import.meta.env.VITE_API_BASE_URL}/api/v1/share/${shareCode.current}/presign-download/${index}`,
-				{ withCredentials: true }
-			);
+			const response = await axios.get(`${import.meta.env.VITE_API_BASE_URL}${presignUrl}`, {
+				withCredentials: true,
+			});
 
 			const { url, content_type, filename } = response.data?.data || {};
 			if (!url) throw new Error('Download URL not received');
-
 			// Fetch the file directly from R2 using the presigned URL
-			const fileResponse = await axios.get(url, {
-				responseType: 'blob',
-			});
+			const fileResponse = await fetch(url);
+
+			if (!fileResponse.ok) {
+				throw new Error(
+					`${fileResponse.status} : R2 Download failed: ${fileResponse.statusText}`
+				);
+			}
+
+			// Extract the blob from the fetch response
+			const encryptedBlob = await fileResponse.blob();
 
 			// DECRYPT FILE LOCALLY
-			const decryptedBuffer = await decryptFileWithSessionKey(
-				fileResponse.data,
-				decryptionKey
-			);
+			const decryptedBuffer = await decryptFileWithSessionKey(encryptedBlob, decryptionKey);
 
 			// Create object URL and trigger download
 			const blob = new Blob([decryptedBuffer], {
@@ -188,16 +248,16 @@ const FileReceive: React.FC = () => {
 
 			<div className="relative z-10 min-h-screen">
 				{/* Breadcrumb */}
-									<div className="mb-4 mt-8 mx-4 px-2 max-sm:px-0">
-										<Link
-											to="/dashboard"
-											className="inline-flex items-center gap-2 text-p4/70 hover:text-p4 transition-colors text-sm rounded-md px-2 py-1"
-											aria-label="Back to dashboard"
-										>
-											<ChevronLeft size={16} className="text-p1" />
-											<span>Back to dashboard</span>
-										</Link>
-									</div>
+				<div className="mb-4 mt-8 mx-4 px-2 max-sm:px-0">
+					<Link
+						to="/dashboard"
+						className="inline-flex items-center gap-2 text-p4/70 hover:text-p4 transition-colors text-sm rounded-md px-2 py-1"
+						aria-label="Back to dashboard"
+					>
+						<ChevronLeft size={16} className="text-p1" />
+						<span>Back to dashboard</span>
+					</Link>
+				</div>
 				{/* Header */}
 				<motion.header
 					initial={{ opacity: 0, y: -20 }}
@@ -205,8 +265,6 @@ const FileReceive: React.FC = () => {
 					transition={{ duration: 0.6 }}
 					className="pt-8 pb-6 px-6 text-center max-w-4xl mx-auto"
 				>
-					
-
 					<h1 className="text-5xl font-bold mb-3 text-p4 max-md:text-4xl max-sm:text-3xl">
 						Receive Files
 					</h1>
@@ -235,7 +293,9 @@ const FileReceive: React.FC = () => {
 									<div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-3 rounded-xl">
 										<Package className="text-p1" size={24} />
 									</div>
-									<h2 className="text-xl font-bold text-p4">Enter Sharing Code</h2>
+									<h2 className="text-xl font-bold text-p4">
+										Enter Sharing Code
+									</h2>
 								</div>
 
 								<form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
@@ -330,8 +390,12 @@ const FileReceive: React.FC = () => {
 											>
 												<Inbox className="text-p4/30 mb-4" size={80} />
 											</motion.div>
-											<p className="text-p4/60 text-base font-medium mb-2">No Files Yet</p>
-											<p className="text-p4/40 text-sm">Enter a sharing code to access files</p>
+											<p className="text-p4/60 text-base font-medium mb-2">
+												No Files Yet
+											</p>
+											<p className="text-p4/40 text-sm">
+												Enter a sharing code to access files
+											</p>
 										</motion.div>
 									) : (
 										<motion.div
@@ -344,10 +408,15 @@ const FileReceive: React.FC = () => {
 											{/* Files Stats */}
 											<div className="flex items-center justify-between mb-4 bg-s1/30 border border-s4/25 rounded-xl px-4 py-3 flex-shrink-0">
 												<div className="flex items-center gap-3">
-													<CheckCircle2 className="text-green-400" size={20} />
+													<CheckCircle2
+														className="text-green-400"
+														size={20}
+													/>
 													<span className="text-p4 font-semibold text-sm">
 														{receivedFiles.length}{' '}
-														{receivedFiles.length === 1 ? 'file' : 'files'}
+														{receivedFiles.length === 1
+															? 'file'
+															: 'files'}
 													</span>
 												</div>
 												<span className="text-p4/70 font-medium text-sm">
@@ -367,13 +436,23 @@ const FileReceive: React.FC = () => {
 													>
 														<div className="flex items-center gap-3 flex-1 min-w-0">
 															<div className="bg-gradient-to-br from-purple-500/20 to-blue-500/20 p-2.5 rounded-lg flex-shrink-0">
-																<FileIcon className="text-p1" size={20} />
+																<FileIcon
+																	className="text-p1"
+																	size={20}
+																/>
 															</div>
 															<div className="flex-1 min-w-0">
-																<p title={file.name} className="text-p4 truncate font-medium text-sm mb-0.5">
+																<p
+																	title={file.name}
+																	className="text-p4 truncate font-medium text-sm mb-0.5"
+																>
 																	{file.name}
 																</p>
-																<p className="text-p4/60 text-xs">{formatFileSize(Number(file.size))}</p>
+																<p className="text-p4/60 text-xs">
+																	{formatFileSize(
+																		Number(file.size)
+																	)}
+																</p>
 															</div>
 														</div>
 														<Button
@@ -385,9 +464,15 @@ const FileReceive: React.FC = () => {
 															title="Download file"
 														>
 															{downloadingIndex === index ? (
-																<Loader2 className="text-green-400 animate-spin" size={16} />
+																<Loader2
+																	className="text-green-400 animate-spin"
+																	size={16}
+																/>
 															) : (
-																<Download className="text-green-400" size={16} />
+																<Download
+																	className="text-green-400"
+																	size={16}
+																/>
 															)}
 														</Button>
 													</motion.div>
