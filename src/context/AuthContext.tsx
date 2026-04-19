@@ -25,7 +25,7 @@ export const AuthProvider = ({ children }: { children: React.ReactNode }) => {
 				withCredentials: true,
 				signal: controller.signal,
 			})
-			.then((res) => setUser(res.data))
+			.then((res) => setUser(res.data.data))
 			.catch((err) => {
 				if (err.name === 'CanceledError' || err.name === 'AbortError') return;
 				setUser(null);
