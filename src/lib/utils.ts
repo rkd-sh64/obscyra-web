@@ -14,3 +14,8 @@ export const formatFileSize = (bytes: number) => {
 	const gb = mb / 1024;
 	return gb.toFixed(2) + ' GB';
 };
+
+export const toUrlSafeBase64 = (b64: string) =>
+	b64.replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+
+export const fromUrlSafeBase64 = (b64: string) => b64.replace(/-/g, '+').replace(/_/g, '/');
