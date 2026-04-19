@@ -193,7 +193,7 @@ const FileUpload: React.FC = () => {
 			}
 
 			// Extract public keys for comma separated list
-			const recipientPubKeys = recipientPubKey.split(',').map((key) => key.trim());
+			const recipientPubKeys = recipientPubKey.split(',').map((key) => key.trim()).filter((key) => key.length > 0);
 			if (recipientPubKeys.length === 0) {
 				toast.error('No recipient public keys provided');
 				return;

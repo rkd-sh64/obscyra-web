@@ -1,7 +1,9 @@
+import Loader from '@/components/Loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/context/AuthContext';
 import { deriveMasterKey, deriveAuthToken, unwrapPrivateKey, exportKey } from '@/crypto/keys';
 import { loginSchema } from '@/schema/auth';
 import type { LogInFormFields } from '@/types/auth';
@@ -11,7 +13,7 @@ import { motion } from 'framer-motion';
 import { User, Lock, EyeOff, Eye } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const Login: React.FC = () => {
@@ -25,6 +27,7 @@ const Login: React.FC = () => {
 	const [showPassword, setShowPassword] = useState(false);
 	const location = useLocation();
 	const navigate = useNavigate();
+	const { user, setUser, isLoading } = useAuth();
 
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
@@ -71,6 +74,11 @@ const Login: React.FC = () => {
 
 			toast.success('Login Successful');
 			reset();
+			setUser({
+				id: result.data.id,
+				username: result.data.username,
+				email: result.data.email,
+			});
 			navigate('/dashboard', { replace: true });
 		} catch (error: unknown) {
 			console.error('Login Error:', error);
@@ -83,6 +91,9 @@ const Login: React.FC = () => {
 			);
 		}
 	};
+
+	if (isLoading) return <Loader />;
+	if (user) return <Navigate to="/dashboard" replace />;
 
 	return (
 		<div className="min-h-screen grid lg:grid-cols-2 relative overflow-hidden">
