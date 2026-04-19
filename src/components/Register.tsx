@@ -1,7 +1,9 @@
+import Loader from '@/components/Loader';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { useAuth } from '@/context/AuthContext';
 import {
 	deriveMasterKey,
 	exportKey,
@@ -18,7 +20,7 @@ import { User, Lock, Mail, Eye, EyeOff } from 'lucide-react';
 import React from 'react';
 import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
-import { Link, useLocation, useNavigate } from 'react-router-dom';
+import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const Register: React.FC = () => {
@@ -34,6 +36,7 @@ const Register: React.FC = () => {
 	} = useForm<RegisterFormFields>({
 		resolver: zodResolver(registerSchema),
 	});
+	const { user, isLoading } = useAuth();
 
 	useEffect(() => {
 		const params = new URLSearchParams(location.search);
@@ -98,6 +101,9 @@ const Register: React.FC = () => {
 			);
 		}
 	};
+
+	if (isLoading) return <Loader />;
+	if (user) return <Navigate to="/dashboard" replace />;
 
 	return (
 		<div className="min-h-screen grid lg:grid-cols-2 relative overflow-hidden">
