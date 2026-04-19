@@ -7,7 +7,9 @@ import {
 	wrapSessionKeyForRecipient,
 	base64ToArrayBuffer,
 	RSA_ALGORITHM,
+	exportKey,
 } from '@/crypto';
+import { toUrlSafeBase64 } from '@/lib/utils';
 import axios from 'axios';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
@@ -193,18 +195,23 @@ const FileUpload: React.FC = () => {
 			}
 
 			// Extract public keys for comma separated list
-			const recipientPubKeys = recipientPubKey.split(',').map((key) => key.trim()).filter((key) => key.length > 0);
-			if (recipientPubKeys.length === 0) {
+			const recipientPubKeys = recipientPubKey
+				.split(',')
+				.map((key) => key.trim())
+				.filter((key) => key.length > 0);
+			if (receiverMode === 'verified' && recipientPubKeys.length === 0) {
 				toast.error('No recipient public keys provided');
 				return;
 			}
 
-			const maxUploadSize = 100 << 20; // 100 MB
+			const maxUploadSize = 8 * 1024 * 1024 * 1024; // 8 GB
 
 			if (files.reduce((acc, file) => acc + file.size, 0) > maxUploadSize) {
-				toast.error('Total file size exceeds 100MB limit');
+				toast.error('Total file size exceeds 8 GB limit');
 				return;
 			}
+
+			let wrappedKeys: { publicKey: string; encryptedKey: string }[] = [];
 
 			setIsUploading(true);
 
@@ -216,23 +223,28 @@ const FileUpload: React.FC = () => {
 				})
 			);
 
-			// DIGITAL ENVELOPS: Wrap AES key with recipient's public key
-			const wrappedKeys = await Promise.all(
-				recipientPubKeys.map(async (pubKey) => {
-					const importedPubKey = await importKey(
-						base64ToArrayBuffer(pubKey),
-						'spki',
-						RSA_ALGORITHM,
-						true,
-						['wrapKey']
-					);
-					const wrappedKey = await wrapSessionKeyForRecipient(sessionKey, importedPubKey);
-					return {
-						publicKey: pubKey,
-						encryptedKey: wrappedKey,
-					};
-				})
-			);
+			if (receiverMode === 'verified') {
+				// DIGITAL ENVELOPS: Wrap AES key with recipient's public key
+				wrappedKeys = await Promise.all(
+					recipientPubKeys.map(async (pubKey) => {
+						const importedPubKey = await importKey(
+							base64ToArrayBuffer(pubKey),
+							'spki',
+							RSA_ALGORITHM,
+							true,
+							['wrapKey']
+						);
+						const wrappedKey = await wrapSessionKeyForRecipient(
+							sessionKey,
+							importedPubKey
+						);
+						return {
+							publicKey: pubKey,
+							encryptedKey: wrappedKey,
+						};
+					})
+				);
+			}
 
 			// 1. Request presigned URLs
 			const payload = encryptedFiles.map((file) => ({
@@ -251,17 +263,34 @@ const FileUpload: React.FC = () => {
 
 			for (let i = 0; i < encryptedFiles.length; i++) {
 				const file = encryptedFiles[i];
-
 				const { uploadURL } = results.urls[i];
-				await axios.put(uploadURL, file.encryptedBlob, {
+
+				const response = await fetch(uploadURL, {
+					method: 'PUT',
+					body: file.encryptedBlob,
 					headers: {
 						'Content-Type': 'application/octet-stream',
 					},
 				});
+
+				if (!response.ok) {
+					throw new Error(`${response.status}: R2 Upload failed: ${response.statusText}`);
+				}
 			}
 
-			const completeUploadPayload = {
+			let completeUploadPayload: {
+				token: string;
+				isAnonymous: boolean;
+				files: {
+					filename: string;
+					size: number;
+					key: string;
+					contentType: string;
+				}[];
+				wrappedKeys?: { publicKey: string; encryptedKey: string }[]; // Optional wrapped keys
+			} = {
 				token: results.token,
+				isAnonymous: receiverMode === 'anonymous',
 				files: results.urls.map(
 					(url: { filename: string; uploadURL: string; key: string }, index: number) => ({
 						filename: files[index].name,
@@ -270,8 +299,9 @@ const FileUpload: React.FC = () => {
 						contentType: files[index].type,
 					})
 				),
-				recipientKeys: wrappedKeys,
 			};
+
+			if (receiverMode === 'verified') completeUploadPayload['wrappedKeys'] = wrappedKeys;
 
 			const completeUploadRes = await axios.post(
 				`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/complete`,
@@ -285,7 +315,10 @@ const FileUpload: React.FC = () => {
 			);
 
 			const code = completeUploadRes.data?.data?.share_code;
-			const fullUrl = `${window.location.origin}/share/receive?scode=${code}`;
+			let fullUrl = `${window.location.origin}/share/receive?scode=${code}`;
+
+			const exportedKey = (await exportKey(sessionKey, 'raw')) as string;
+			if (receiverMode === 'anonymous') fullUrl += `#${toUrlSafeBase64(exportedKey)}`;
 
 			setShareCode(code);
 			setShareUrl(fullUrl);
@@ -444,8 +477,6 @@ const FileUpload: React.FC = () => {
 					transition={{ duration: 0.6 }}
 					className="pt-8 pb-6 px-6 text-center max-w-4xl mx-auto w-full"
 				>
-
-
 					<h1 className="text-5xl font-bold mb-3 text-p4 max-md:text-4xl max-sm:text-3xl">
 						{uploadComplete ? '' : 'Upload Files'}
 					</h1>
@@ -481,10 +512,13 @@ const FileUpload: React.FC = () => {
 										<div className="relative border-2 border-s4/25 bg-s1/50 backdrop-blur-xl rounded-3xl shadow-2xl overflow-hidden p-6 max-md:p-5 max-sm:p-4">
 											{receiverMode && (
 												<div className="mb-3 flex justify-end">
-													<span className={`inline-flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-full border text-p4 ${receiverMode === 'verified'
-															? 'border-blue-500/40 bg-blue-500/10'
-															: 'border-purple-500/40 bg-purple-500/10'
-														}`}>
+													<span
+														className={`inline-flex items-center justify-center gap-1.5 text-xs px-3 py-1.5 rounded-full border text-p4 ${
+															receiverMode === 'verified'
+																? 'border-blue-500/40 bg-blue-500/10'
+																: 'border-purple-500/40 bg-purple-500/10'
+														}`}
+													>
 														{receiverMode === 'verified' ? (
 															<>
 																<CheckCircle className="w-3.5 h-3.5 text-p1" />
@@ -564,7 +598,9 @@ const FileUpload: React.FC = () => {
 													type="text"
 													placeholder="Enter recipient's public key"
 													value={recipientPubKey}
-													onChange={(e) => setRecipientPubKey(e.target.value)}
+													onChange={(e) =>
+														setRecipientPubKey(e.target.value)
+													}
 													className="mt-4 w-full border-s4/25 rounded-xl py-6 focus:border-p1/50 focus:bg-s1/30 focus:outline-none focus:ring-2 focus:ring-s1/70 transition-all duration-300"
 												/>
 											)}
@@ -793,38 +829,40 @@ const FileUpload: React.FC = () => {
 											{/* Share Details */}
 											<div className="space-y-4">
 												{/* Share Code */}
-												<div>
-													<label className="flex items-center gap-2 text-sm font-semibold text-p4 mb-2 max-sm:text-xs">
-														<LinkIcon
-															size={16}
-															className="text-p1 max-sm:size-4"
-														/>
-														Share Code
-													</label>
-													<div className="flex items-center gap-2 w-full">
-														<div className="flex-1 flex items-center bg-s1/30 border-2 border-s4/25 rounded-xl px-4 py-3 max-sm:px-3 max-sm:py-2 min-w-0 overflow-hidden">
-															<span className="text-p4 font-mono text-lg truncate font-bold max-sm:text-base w-full">
-																{shareCode}
-															</span>
-														</div>
-														<Button
-															variant="ghost"
-															size="icon"
-															className="bg-s1/30 hover:bg-s1/40 border-2 border-s4/25 rounded-xl h-12 w-12 cursor-pointer flex-shrink-0 max-sm:h-10 max-sm:w-10"
-															onClick={() => {
-																navigator.clipboard.writeText(
-																	shareCode
-																);
-																toast.success('Code copied!');
-															}}
-														>
-															<Copy
+												{receiverMode === 'verified' && (
+													<div>
+														<label className="flex items-center gap-2 text-sm font-semibold text-p4 mb-2 max-sm:text-xs">
+															<LinkIcon
+																size={16}
 																className="text-p1 max-sm:size-4"
-																size={18}
 															/>
-														</Button>
+															Share Code
+														</label>
+														<div className="flex items-center gap-2 w-full">
+															<div className="flex-1 flex items-center bg-s1/30 border-2 border-s4/25 rounded-xl px-4 py-3 max-sm:px-3 max-sm:py-2 min-w-0 overflow-hidden">
+																<span className="text-p4 font-mono text-lg truncate font-bold max-sm:text-base w-full">
+																	{shareCode}
+																</span>
+															</div>
+															<Button
+																variant="ghost"
+																size="icon"
+																className="bg-s1/30 hover:bg-s1/40 border-2 border-s4/25 rounded-xl h-12 w-12 cursor-pointer flex-shrink-0 max-sm:h-10 max-sm:w-10"
+																onClick={() => {
+																	navigator.clipboard.writeText(
+																		shareCode
+																	);
+																	toast.success('Code copied!');
+																}}
+															>
+																<Copy
+																	className="text-p1 max-sm:size-4"
+																	size={18}
+																/>
+															</Button>
+														</div>
 													</div>
-												</div>
+												)}
 
 												{/* Share URL */}
 												<div>
@@ -945,14 +983,12 @@ const FileUpload: React.FC = () => {
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 1 }}
 						exit={{ opacity: 0 }}
-
 						className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/90 backdrop-blur-sm px-4"
 					>
 						<motion.div
 							initial={{ scale: 0.85, opacity: 0 }}
 							animate={{ scale: 1, opacity: 1 }}
 							exit={{ scale: 0.85, opacity: 0 }}
-
 							transition={{ type: 'spring', stiffness: 260, damping: 20 }}
 							className="w-full max-w-md bg-s1 border-2 border-s4/25 rounded-2xl p-6 shadow-2xl"
 						>
@@ -964,10 +1000,11 @@ const FileUpload: React.FC = () => {
 								{/* Anonymous */}
 								<div
 									onClick={() => setReceiverMode('anonymous')}
-									className={`cursor-pointer flex flex-col items-center text-center gap-2 border rounded-xl p-4 transition-all hover:scale-105 ${receiverMode === 'anonymous'
-										? 'border-p1 bg-s1/40'
-										: 'border-s4/25 hover:bg-s1/30'
-										}`}
+									className={`cursor-pointer flex flex-col items-center text-center gap-2 border rounded-xl p-4 transition-all hover:scale-105 ${
+										receiverMode === 'anonymous'
+											? 'border-p1 bg-s1/40'
+											: 'border-s4/25 hover:bg-s1/30'
+									}`}
 								>
 									<div className="p-3 rounded-xl bg-purple-500/20">
 										<UserX className="text-p1" size={22} />
@@ -981,10 +1018,11 @@ const FileUpload: React.FC = () => {
 								{/* Verified */}
 								<div
 									onClick={() => setReceiverMode('verified')}
-									className={`cursor-pointer flex flex-col items-center text-center gap-2 border rounded-xl p-4 transition-all hover:scale-105 ${receiverMode === 'verified'
-										? 'border-p1 bg-s1/40'
-										: 'border-s4/25 hover:bg-s1/30'
-										}`}
+									className={`cursor-pointer flex flex-col items-center text-center gap-2 border rounded-xl p-4 transition-all hover:scale-105 ${
+										receiverMode === 'verified'
+											? 'border-p1 bg-s1/40'
+											: 'border-s4/25 hover:bg-s1/30'
+									}`}
 								>
 									<div className="p-3 rounded-xl bg-blue-500/20">
 										<CheckCircle2 className="text-p1" size={22} />
