@@ -22,7 +22,7 @@ import { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-
+import { Loader2 } from 'lucide-react';
 const Register: React.FC = () => {
 	const [showPassword, setShowPassword] = useState(false);
 	const [showConfirmPassword, setShowConfirmPassword] = useState(false);
@@ -31,7 +31,7 @@ const Register: React.FC = () => {
 	const {
 		register,
 		handleSubmit,
-		formState: { errors },
+		formState: { errors, isSubmitting },
 		reset,
 	} = useForm<RegisterFormFields>({
 		resolver: zodResolver(registerSchema),
@@ -411,7 +411,8 @@ const Register: React.FC = () => {
 								>
 									<Button
 										type="submit"
-										className="w-full py-3 bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer max-sm:py-2.5 max-sm:text-sm"
+										disabled={isSubmitting}
+										className="w-full py-3 bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer max-sm:py-2.5 max-sm:text-sm disabled:opacity-70 flex items-center justify-center gap-2"
 										style={{
 											backgroundSize: '200% 100%',
 											backgroundPosition: '0% 0%',
@@ -423,7 +424,14 @@ const Register: React.FC = () => {
 											e.currentTarget.style.backgroundPosition = '0% 0%';
 										}}
 									>
-										Register
+										{isSubmitting ? (
+											<>
+												<Loader2 className="h-4 w-4 animate-spin" />
+												Registering...
+											</>
+										) : (
+											'Register'
+										)}
 									</Button>
 								</motion.div>
 

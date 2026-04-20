@@ -2,6 +2,8 @@ import clsx from 'clsx';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Link as LinkScroll } from 'react-scroll';
+import { useAuth } from '@/context/AuthContext';
+import axios from 'axios';
 
 interface NavLinkProps {
 	title: string;
@@ -9,6 +11,8 @@ interface NavLinkProps {
 
 const Header = () => {
 	const navigate = useNavigate();
+	const { user, setUser } = useAuth();
+
 	const [hasScrolled, setHasScrolled] = useState(false);
 	const [isOpen, setIsOpen] = useState(false);
 
@@ -18,11 +22,22 @@ const Header = () => {
 		};
 
 		window.addEventListener('scroll', handleScroll);
-
-		return () => {
-			window.removeEventListener('scroll', handleScroll);
-		};
+		return () => window.removeEventListener('scroll', handleScroll);
 	}, []);
+
+	const handleLogout = async () => {
+		try {
+			await axios.post(
+				`${import.meta.env.VITE_API_BASE_URL}/api/v1/logout`,
+				{},
+				{ withCredentials: true }
+			);
+			setUser(null);
+			navigate('/');
+		} catch (err) {
+			console.error(err);
+		}
+	};
 
 	const NavLink = ({ title }: NavLinkProps) => (
 		<LinkScroll
@@ -46,7 +61,7 @@ const Header = () => {
 			)}
 		>
 			<div className="container flex h-8 items-center justify-between max-lg:px-5">
-				{/* Logo - Left Side */}
+				{/* Logo */}
 				<LinkScroll
 					to="hero"
 					offset={-250}
@@ -63,7 +78,7 @@ const Header = () => {
 					/>
 				</LinkScroll>
 
-				{/* Desktop Navigation - Center */}
+				{/* Desktop Navigation */}
 				<nav className="max-lg:hidden absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2">
 					<ul className="flex items-center gap-6">
 						<li className="flex items-center gap-6">
@@ -90,70 +105,79 @@ const Header = () => {
 					<div className="max-lg:relative max-lg:flex max-lg:flex-col max-lg:min-h-screen max-lg:p-6 max-lg:overflow-hidden sidebar-before max-md:px-4">
 						<nav className="max-lg:relative max-lg:z-2 max-lg:my-auto">
 							<ul className="max-lg:block max-lg:px-12 max-lg:space-y-2">
-								<li>
-									<NavLink title="how it works" />
-								</li>
-								<li>
-									<NavLink title="features" />
-								</li>
-								<li>
-									<NavLink title="pricing" />
-								</li>
-								<li>
-									<NavLink title="faq" />
-								</li>
+								<li><NavLink title="how it works" /></li>
+								<li><NavLink title="features" /></li>
+								<li><NavLink title="pricing" /></li>
+								<li><NavLink title="faq" /></li>
 							</ul>
 						</nav>
 
-						{/* Mobile Login Button */}
-						<div
-							onClick={() => {
-								navigate('/login');
-							}}
-							className="mt-8 px-12"
-						>
-							<button className="w-full base-bold text-p4 uppercase transition-colors duration-500 hover:text-p1 border-2 border-s4/25 rounded-full py-3 bg-s3/10 backdrop-blur-sm">
-								Login
-							</button>
-						</div>
+						{/* Mobile Auth Buttons */}
+						<div className="mt-8 px-12 space-y-3">
+							{user ? (
+								<>
+									<button
+										onClick={() => navigate('/dashboard')}
+										className="w-full base-bold text-p4 uppercase border-2 border-s4/25 rounded-full py-3 bg-s3/10 hover:bg-p1/10 transition"
+									>
+										Dashboard
+									</button>
 
-						<div className="block absolute top-1/2 left-0 w-[960px] h-[380px] translate-x-[-290px] -translate-y-1/2 rotate-90">
-							<img
-								src="/images/bg-outlines.svg"
-								width={960}
-								height={380}
-								alt="outline"
-								className="relative z-2"
-							/>
-							<img
-								src="/images/bg-outlines-fill.png"
-								width={960}
-								height={380}
-								alt="outline"
-								className="absolute inset-0 mix-blend-soft-light opacity-5"
-							/>
+									<button
+										onClick={handleLogout}
+										className="w-full base-bold text-red-400 uppercase border-2 border-red-500/30 rounded-full py-3 hover:bg-red-500/10 transition"
+									>
+										Logout
+									</button>
+								</>
+							) : (
+								<button
+									onClick={() => navigate('/login')}
+									className="w-full base-bold text-p4 uppercase border-2 border-s4/25 rounded-full py-3 bg-s3/10 hover:bg-p1/10 transition"
+								>
+									Login
+								</button>
+							)}
 						</div>
 					</div>
 				</div>
 
-				{/* Desktop Login Button - Right Side */}
-				<button
-					onClick={() => {
-						navigate('/login');
-					}}
-					className="max-lg:hidden base-bold text-p4 uppercase transition-colors duration-500 hover:text-p1 border-2 border-s4/25 rounded-full px-6 py-2 bg-s3/10 backdrop-blur-sm hover:bg-p1/10 z-2"
-				>
-					Login
-				</button>
+				{/* Desktop Right Side */}
+				<div className="hidden lg:flex items-center gap-3 z-2">
+					{user ? (
+						<>
+							<button
+								onClick={() => navigate('/dashboard')}
+								className="base-bold text-p4 uppercase border-2 border-s4/25 rounded-full px-5 py-2 bg-s3/10 hover:bg-p1/10 transition"
+							>
+								Dashboard
+							</button>
 
-				{/* Mobile Menu Toggle */}
+							<button
+								onClick={handleLogout}
+								className="base-bold text-red-400 uppercase border-2 border-red-500/30 rounded-full px-5 py-2 hover:bg-red-500/10 transition"
+							>
+								Logout
+							</button>
+						</>
+					) : (
+						<button
+							onClick={() => navigate('/login')}
+							className="base-bold text-p4 uppercase border-2 border-s4/25 rounded-full px-6 py-2 bg-s3/10 hover:bg-p1/10 transition"
+						>
+							Login
+						</button>
+					)}
+				</div>
+
+				{/* Mobile Toggle */}
 				<button
 					className="lg:hidden z-2 size-10 border-2 border-s4/25 rounded-full flex justify-center items-center ml-4"
-					onClick={() => setIsOpen((prevState) => !prevState)}
+					onClick={() => setIsOpen((prev) => !prev)}
 				>
 					<img
 						src={`/images/${isOpen ? 'close' : 'magic'}.svg`}
-						alt="magic"
+						alt="toggle"
 						className="size-1/2 object-contain"
 					/>
 				</button>

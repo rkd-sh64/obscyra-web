@@ -10,7 +10,7 @@ import type { LogInFormFields } from '@/types/auth';
 import { zodResolver } from '@hookform/resolvers/zod';
 import axios, { AxiosError } from 'axios';
 import { motion } from 'framer-motion';
-import { User, Lock, EyeOff, Eye } from 'lucide-react';
+import { User, Lock, EyeOff, Eye, Loader2 } from 'lucide-react';
 import React, { useState, useEffect } from 'react';
 import { useForm } from 'react-hook-form';
 import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom';
@@ -20,7 +20,7 @@ const Login: React.FC = () => {
 	const {
 		register,
 		handleSubmit,
-		formState: { errors },
+		formState: { errors, isSubmitting },
 		reset,
 	} = useForm<LogInFormFields>({ resolver: zodResolver(loginSchema) });
 
@@ -322,7 +322,8 @@ const Login: React.FC = () => {
 								>
 									<Button
 										type="submit"
-										className="w-full py-3.5 bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer max-sm:py-3 max-sm:text-sm"
+										disabled={isSubmitting}
+										className="w-full py-3.5 bg-gradient-to-r from-purple-500 via-blue-500 to-purple-500 text-white font-semibold rounded-xl shadow-lg hover:shadow-xl hover:scale-[1.02] transition-all duration-300 cursor-pointer max-sm:py-3 max-sm:text-sm disabled:opacity-70 flex items-center justify-center gap-2"
 										style={{
 											backgroundSize: '200% 100%',
 											backgroundPosition: '0% 0%',
@@ -334,7 +335,14 @@ const Login: React.FC = () => {
 											e.currentTarget.style.backgroundPosition = '0% 0%';
 										}}
 									>
-										Login
+										{isSubmitting ? (
+											<>
+												<Loader2 className="h-4 w-4 animate-spin opacity-80" />
+												Logging in...
+											</>
+										) : (
+											'Login'
+										)}
 									</Button>
 								</motion.div>
 
