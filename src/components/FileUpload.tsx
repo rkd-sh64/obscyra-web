@@ -315,7 +315,7 @@ const FileUpload: React.FC = () => {
 					key: string;
 					contentType: string;
 				}[];
-				wrappedKeys?: { publicKey: string; encryptedKey: string }[];
+				recipientKeys?: { publicKey: string; encryptedKey: string }[]; // Optional wrapped keys
 			} = {
 				token: results.token,
 				isAnonymous: receiverMode === 'anonymous',
@@ -329,7 +329,7 @@ const FileUpload: React.FC = () => {
 				),
 			};
 
-			if (receiverMode === 'verified') completeUploadPayload['wrappedKeys'] = wrappedKeys;
+			if (receiverMode === 'verified') completeUploadPayload['recipientKeys'] = wrappedKeys;
 
 			const completeUploadRes = await axios.post(
 				`${import.meta.env.VITE_API_BASE_URL}/api/v1/files/complete`,
