@@ -1,15 +1,17 @@
 import Button from '@/components/Button.js';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
-import { Element, Link as LinkScroll } from 'react-scroll';
+import { Element } from 'react-scroll';
 
 const Hero = () => {
 	const navigate = useNavigate();
+
 	return (
 		<section className="relative pt-52 pb-40 max-lg:pt-52 max-lg:pb-36 max-md:pt-36 max-md:pb-32 overflow-hidden">
 			<Element name="hero">
 				<div className="container">
 					<div className="relative z-2 max-w-[750px] max-lg:max-w-388">
+						{/* Caption */}
 						<motion.div
 							initial={{ opacity: 0, y: 20 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -19,6 +21,7 @@ const Hero = () => {
 							Secure File Sharing
 						</motion.div>
 
+						{/* Heading */}
 						<motion.h1
 							initial={{ opacity: 0, y: 30 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -28,6 +31,7 @@ const Hero = () => {
 							Share Smart. <span className="block text-p3">Share Safe.</span>
 						</motion.h1>
 
+						{/* Description */}
 						<motion.p
 							initial={{ opacity: 0, y: 30 }}
 							animate={{ opacity: 1, y: 0 }}
@@ -38,25 +42,39 @@ const Hero = () => {
 							effortless — all right from your browser.
 						</motion.p>
 
+						{/* Buttons */}
 						<motion.div
 							initial={{ opacity: 0, y: 30 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.7, delay: 0.3, ease: 'easeOut' }}
+							className="flex items-center gap-4 lg:flex-wrap "
 						>
-							<LinkScroll to="/share/send" offset={-100} spy smooth>
-								<Button
-									containerClassName="cursor-pointer"
-									icon="/images/zap.svg"
-									onClick={() => {
-										navigate('/share/send');
-									}}
-								>
-									Send a File Now
-								</Button>
-							</LinkScroll>
+							{/* Primary Button */}
+							<Button
+								containerClassName="cursor-pointer"
+								icon="/images/zap.svg"
+								onClick={() => navigate('/share/send')}
+							>
+								<span className='flex'>
+									Send <span className='lg:block hidden ml-1'> A File</span>
+								</span>
+							</Button>
+
+							{/* Secondary Button (Outlined Style) */}
+							<Button
+								containerClassName="cursor-pointer border border-s4/25 bg-transparent hover:bg-s1/30 text-p4 "
+								icon="/images/zap.svg"
+								onClick={() => navigate('/share/receive')}
+							>
+								<span className='flex'>
+									Receive <span className='lg:block hidden ml-1'> A File</span>
+								</span>
+								
+							</Button>
 						</motion.div>
 					</div>
 
+					{/* Hero Image */}
 					<motion.div
 						initial={{ opacity: 0, scale: 0.9, x: 50 }}
 						animate={{ opacity: 1, scale: 1, x: 0 }}
@@ -68,9 +86,7 @@ const Hero = () => {
 						className="absolute top-[12rem] left-[50rem] w-[600px] pointer-events-none hero-img_res"
 					>
 						<motion.img
-							animate={{
-								y: [0, -15, 0],
-							}}
+							animate={{ y: [0, -15, 0] }}
 							transition={{
 								duration: 4,
 								repeat: Infinity,
@@ -82,7 +98,7 @@ const Hero = () => {
 						/>
 					</motion.div>
 
-					{/* Subtle background gradient animation */}
+					{/* Background Glow */}
 					<motion.div
 						initial={{ opacity: 0 }}
 						animate={{ opacity: 0.4 }}
@@ -96,3 +112,8 @@ const Hero = () => {
 };
 
 export default Hero;
+
+
+
+
+
