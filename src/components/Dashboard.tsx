@@ -9,7 +9,7 @@ export default function ShareLanding() {
 
 	return (
 		<div className="min-h-screen bg-gradient-to-br from-slate-950 via-slate-900 to-slate-950 relative overflow-hidden flex items-center justify-center p-6">
-			<div className="absolute top-6 right-6 z-20">
+			<div className="absolute top-6 right-6 z-20 ">
 				<LayoutHeader/>
 			</div>
 			{/* Top-right logout 
@@ -25,7 +25,7 @@ export default function ShareLanding() {
 				</Button>
 			</div>*/}
 
-			<div className="absolute inset-0 opacity-20 pointer-events-none">
+			<div className="absolute inset-0 opacity-20 pointer-events-none ">
 				<motion.div
 					animate={{ scale: [1, 1.25, 1], opacity: [0.12, 0.32, 0.12] }}
 					transition={{ duration: 7, repeat: Infinity, ease: 'easeInOut' }}
@@ -38,7 +38,7 @@ export default function ShareLanding() {
 				/>
 			</div>
 
-			<div className="relative z-10 max-w-6xl w-full">
+			<div className="relative z-10 max-w-6xl w-full mt-20">
 				<header className="text-center mb-8 px-3">
 					<motion.h1
 						initial={{ opacity: 0, y: -12 }}

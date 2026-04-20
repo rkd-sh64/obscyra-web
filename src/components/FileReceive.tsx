@@ -254,7 +254,7 @@ const FileReceive: React.FC = () => {
 				<div className="relative z-10 min-h-screen">
 					{/* Breadcrumb */}
 					{user && (
-						<div className="mb-4 mt-8 mx-4 px-2 max-sm:px-0 lg:pl-28">
+						<div className="lg:mb-0 mb-4 mx-4 px-2 max-sm:px-0 lg:pl-28">
 							<Link
 								to="/dashboard"
 								className="inline-flex items-center gap-2 text-p4/70 hover:text-p4 transition-colors text-sm rounded-md px-2 py-1"
@@ -270,7 +270,7 @@ const FileReceive: React.FC = () => {
 						initial={{ opacity: 0, y: -20 }}
 						animate={{ opacity: 1, y: 0 }}
 						transition={{ duration: 0.6 }}
-						className="pt-8 pb-6 px-6 text-center max-w-4xl mx-auto"
+						className=" pb-6 px-6 text-center max-w-4xl mx-auto"
 					>
 						<h1 className="text-5xl font-bold mb-3 text-p4 max-md:text-4xl max-sm:text-3xl">
 							Receive Files

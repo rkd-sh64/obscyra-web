@@ -47,7 +47,7 @@ const Hero = () => {
 							initial={{ opacity: 0, y: 30 }}
 							animate={{ opacity: 1, y: 0 }}
 							transition={{ duration: 0.7, delay: 0.3, ease: 'easeOut' }}
-							className="flex items-center gap-4 flex-wrap"
+							className="flex items-center gap-4 lg:flex-wrap "
 						>
 							{/* Primary Button */}
 							<Button
@@ -55,16 +55,21 @@ const Hero = () => {
 								icon="/images/zap.svg"
 								onClick={() => navigate('/share/send')}
 							>
-								Send a File Now
+								<span className='flex'>
+									Send <span className='lg:block hidden ml-1'> A File</span>
+								</span>
 							</Button>
 
 							{/* Secondary Button (Outlined Style) */}
 							<Button
-								containerClassName="cursor-pointer border border-s4/25 bg-transparent hover:bg-s1/30 text-p4"
+								containerClassName="cursor-pointer border border-s4/25 bg-transparent hover:bg-s1/30 text-p4 "
 								icon="/images/zap.svg"
 								onClick={() => navigate('/share/receive')}
 							>
-								Receive a File
+								<span className='flex'>
+									Receive <span className='lg:block hidden ml-1'> A File</span>
+								</span>
+								
 							</Button>
 						</motion.div>
 					</div>
@@ -107,3 +112,8 @@ const Hero = () => {
 };
 
 export default Hero;
+
+
+
+
+
